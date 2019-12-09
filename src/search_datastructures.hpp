@@ -31,6 +31,8 @@
 
 #include <seqan/align_extend.h>
 
+#include "bisulfite_scoring.hpp"
+
 // ============================================================================
 // Tags, Classes, Enums
 // ============================================================================
@@ -415,13 +417,18 @@ public:
 
     /* output file */
     using TScoreScheme3  = std::conditional_t<seqan3::NucleotideAlphabet<TRedAlph>,
-                                              seqan3::nucleotide_scoring_scheme<>,
+                                              std::conditional_t<c_redAlph == AlphabetEnum::DNA3BS,
+                                                                 seqan3::bisulfite_scoring_scheme<>,
+                                                                 seqan3::nucleotide_scoring_scheme<>>,
                                               seqan3::aminoacid_scoring_scheme<>>;
 
     using TScoreScheme  =
         std::conditional_t<seqan3::NucleotideAlphabet<TRedAlph>,
-                           seqan::Score<int, seqan::Simple>,
+                           std::conditional_t<c_redAlph == AlphabetEnum::DNA3BS,
+                                              seqan::Score<int, seqan::Bisulfite>,
+                                              seqan::Score<int, seqan::Simple>>,
                            seqan::Score<int, seqan::ScoreMatrix<seqan::AminoAcid, seqan::ScoreSpecSelectable>>>;
+
     using TIOContext    = seqan::BlastIOContext<TScoreScheme, blastProgram>;
     using TBlastTabFile = seqan::FormattedFile<seqan::BlastTabular, seqan::Output, TIOContext>;
     using TBlastRepFile = seqan::FormattedFile<seqan::BlastReport, seqan::Output, TIOContext>;
@@ -434,15 +441,23 @@ public:
     index_file<c_dbIndexType, c_origSbjAlph> indexFile;
 
     TTransSbjSeqs       transSbjSeqs =
-        initHelper<TTransAlph>(indexFile.seqs, seqan3::view::translate_join, seqan3::view::translate_join);
+        initHelper<TTransAlph>(indexFile.seqs,
+                               seqan3::view::translate_join,
+                               seqan3::view::translate_join);
     TRedSbjSeqs         redSbjSeqs =
-        initHelper<TRedAlph>(transSbjSeqs, seqan3::view::deep{seqan3::view::convert<TRedAlph>}, seqan3::view::dna_n_to_random);
+        initHelper<TRedAlph>(transSbjSeqs,
+                             seqan3::view::deep{seqan3::view::convert<TRedAlph>},
+                             seqan3::view::dna_n_to_random<TRedAlph>);
 
     TQrySeqs            qrySeqs; // used iff outformat is sam or bam
     TTransQrySeqs       transQrySeqs =
-        initHelper<TTransAlph>(qrySeqs, seqan3::view::translate_join, seqan3::view::translate_join);
+        initHelper<TTransAlph>(qrySeqs,
+                               seqan3::view::translate_join,
+                               seqan3::view::translate_join);
     TRedQrySeqs         redQrySeqs =
-        initHelper<TRedAlph>(transQrySeqs, seqan3::view::deep{seqan3::view::convert<TRedAlph>}, seqan3::view::dna_n_to_random);
+        initHelper<TRedAlph>(transQrySeqs,
+                             seqan3::view::deep{seqan3::view::convert<TRedAlph>},
+                             seqan3::view::dna_n_to_random<TRedAlph>);
 
     TQryIds             qryIds;
 

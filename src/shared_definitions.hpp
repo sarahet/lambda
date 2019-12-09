@@ -227,4 +227,4 @@ using TRedAlphModString =
 
 template <typename TSpec, typename TAlph>
 using TRedNuclAlphModString =
-  decltype(std::declval<TSpec &>() | seqan3::view::dna_n_to_random);
+  decltype(std::declval<TSpec &>() | seqan3::view::dna_n_to_random<TAlph>);

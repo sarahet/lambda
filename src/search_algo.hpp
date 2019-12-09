@@ -36,13 +36,14 @@
 
 #include <seqan/align_extend.h>
 
+#include <seqan3/core/debug_stream.hpp>
 #include <seqan3/range/view/complement.hpp>
 #include <seqan3/range/view/translate_join.hpp>
 #include <seqan3/io/sequence_file/input.hpp>
 #include <seqan3/search/algorithm/search.hpp>
 #include <seqan3/alphabet/aminoacid/aa27.hpp>
 
-// #include "search_datastructures.hpp"
+#include "bisulfite_scoring.hpp"
 
 // ============================================================================
 // Forwards
@@ -197,8 +198,16 @@ prepareScoring(GlobalDataHolder<c_dbIndexType, c_origSbjAlph, c_transAlph, c_red
         seqan::setScoreMismatch(context(globalHolder.outfileBlastTab).scoringScheme, options.misMatch);
 
         // Seqan3
-        globalHolder.scoringScheme.set_simple_scheme(seqan3::match_score{options.match},
-                                                     seqan3::mismatch_score{options.misMatch});
+        if constexpr (c_redAlph == AlphabetEnum::DNA3BS)
+        {
+            globalHolder.scoringScheme.set_bisulfite_scheme(seqan3::match_score{options.match},
+                                                            seqan3::mismatch_score{options.misMatch});
+        }
+        else
+        {
+            globalHolder.scoringScheme.set_simple_scheme(seqan3::match_score{options.match},
+                                                         seqan3::mismatch_score{options.misMatch});
+        }
     }
     else
     {
@@ -235,7 +244,7 @@ prepareScoring(GlobalDataHolder<c_dbIndexType, c_origSbjAlph, c_transAlph, c_red
     seqan::setScoreGapExtend(seqan::context(globalHolder.outfileBlastTab).scoringScheme, options.gapExtend);
 
     if (!seqan::isValid(seqan::context(globalHolder.outfileBlastTab).scoringScheme))
-        throw std::runtime_error{"Could not computer Karlin-Altschul-Values for Scoring Scheme.\n"};
+        throw std::runtime_error{"Could not compute Karlin-Altschul-Values for Scoring Scheme.\n"};
 
     // seqan3
     globalHolder.gapScheme.set_affine(seqan3::gap_score{options.gapExtend},
@@ -282,7 +291,7 @@ loadDbIndexFromDisk(TGlobalHolder       & globalHolder,
         if constexpr (TGlobalHolder::blastProgram == seqan::BlastProgram::BLASTN)
         {
             globalHolder.redSbjSeqs = globalHolder.transSbjSeqs
-                                    | seqan3::view::dna_n_to_random;
+                                    | seqan3::view::dna_n_to_random<typename TGlobalHolder::TRedAlph>;
         }
         else
         {
@@ -408,7 +417,7 @@ loadQuery(GlobalDataHolder<c_indexType, c_origSbjAlph, c_transAlph, c_redAlph, c
         if constexpr (c_transAlph != AlphabetEnum::AMINO_ACID)
         {
             globalHolder.redQrySeqs = globalHolder.transQrySeqs
-                                    | seqan3::view::dna_n_to_random;
+                                    | seqan3::view::dna_n_to_random<TRedAlph>;
         }
         else
         {
@@ -492,7 +501,6 @@ seedLooksPromising(LocalDataHolder<TGlobalHolder> const & lH,
         if (maxScore >= thresh)
             return true;
     }
-
     return false;
 }
 
@@ -1194,8 +1202,10 @@ iterateMatchesFullSerial(TLocalHolder & lH)
                                     seqan::FreeEndGaps_<True, True, True, True>,
                                     seqan::TracebackOff> TAlignConfig;
 
-        seqan::DPScoutState_<seqan::Default> scoutState;
+        seqan::DPScoutState_<seqan::Default> scoutState{};
 
+        clear(bm.alignStats);
+        clear(lH.alignContext);
         bm.alignStats.alignmentScore =
         _setUpAndRunAlignment(lH.alignContext.dpContext,
                               lH.alignContext.traceSegment,
@@ -1205,6 +1215,9 @@ iterateMatchesFullSerial(TLocalHolder & lH)
                               seqan::seqanScheme(seqan::context(lH.gH.outfileBlastTab).scoringScheme),
                               TAlignConfig(-band, +band));
 
+        seqan3::debug_stream << seqan::source(bm.alignRow0) << '\n';
+        seqan3::debug_stream << seqan::source(bm.alignRow1) << '\n';
+        std::cout << bm.alignStats.alignmentScore << std::endl;
         computeEValueThreadSafe(bm, record.qLength, seqan::context(lH.gH.outfileBlastTab));
 
         if (bm.eValue > lH.options.eCutOff)
@@ -1224,7 +1237,7 @@ iterateMatchesFullSerial(TLocalHolder & lH)
         _expandAlign(bm, lH);
 
         seqan::computeAlignmentStats(bm, seqan::context(lH.gH.outfileBlastTab));
-
+        std::cout << bm.alignStats.alignmentScore << std::endl;
         if (bm.alignStats.alignmentIdentity < lH.options.idCutOff)
         {
             ++lH.stats.hitsFailedExtendPercentIdentTest;

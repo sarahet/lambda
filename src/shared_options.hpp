@@ -26,6 +26,7 @@
 #include <thread>
 #include <unistd.h>
 
+#include <seqan3/alphabet/nucleotide/dna3bs.hpp>
 #include <seqan3/alphabet/nucleotide/dna4.hpp>
 #include <seqan3/alphabet/nucleotide/dna5.hpp>
 #include <seqan3/alphabet/aminoacid/aa27.hpp>
@@ -89,6 +90,12 @@ _indexNameToEnum(std::string const t)
 // --------------------------------------------------------------------------
 
 constexpr const char *
+_alphTypeToName(seqan3::dna3bs const & /**/)
+{
+    return "dna3bs";
+}
+
+constexpr const char *
 _alphTypeToName(seqan3::dna4 const & /**/)
 {
     return "dna4";
@@ -121,6 +128,7 @@ _alphTypeToName(seqan3::aa10murphy const & /**/)
 enum class AlphabetEnum : uint8_t
 {
     UNDEFINED,
+    DNA3BS,
     DNA4,
     DNA5,
     AMINO_ACID,
@@ -133,6 +141,7 @@ _alphabetEnumToName(AlphabetEnum const t)
     switch (t)
     {
         case AlphabetEnum::UNDEFINED:   return "UNDEFINED";
+        case AlphabetEnum::DNA3BS:      return _alphTypeToName(seqan3::dna3bs{});
         case AlphabetEnum::DNA4:        return _alphTypeToName(seqan3::dna4{});
         case AlphabetEnum::DNA5:        return _alphTypeToName(seqan3::dna5{});
         case AlphabetEnum::AMINO_ACID:  return _alphTypeToName(seqan3::aa27{});
@@ -148,6 +157,8 @@ _alphabetNameToEnum(std::string const t)
 {
     if ((t == "UNDEFINED") || (t == "auto"))
         return AlphabetEnum::UNDEFINED;
+    else if (t == _alphTypeToName(seqan3::dna3bs{}))
+        return AlphabetEnum::DNA3BS;
     else if (t == _alphTypeToName(seqan3::dna4{}))
         return AlphabetEnum::DNA4;
     else if (t == _alphTypeToName(seqan3::dna5{}))
@@ -163,6 +174,12 @@ _alphabetNameToEnum(std::string const t)
 
 template <AlphabetEnum e>
 struct _alphabetEnumToType_;
+
+template <>
+struct _alphabetEnumToType_<AlphabetEnum::DNA3BS>
+{
+    using type = seqan3::dna3bs;
+};
 
 template <>
 struct _alphabetEnumToType_<AlphabetEnum::DNA4>

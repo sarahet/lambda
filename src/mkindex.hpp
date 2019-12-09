@@ -176,6 +176,7 @@ void argConv3b(LambdaIndexerOptions const & options)
     {
         case AlphabetEnum::DNA5:       return realMain<c_indexType, c_origAlph, c_transAlph, AlphabetEnum::DNA5>(options);
         case AlphabetEnum::DNA4:       return realMain<c_indexType, c_origAlph, c_transAlph, AlphabetEnum::DNA4>(options);
+        case AlphabetEnum::DNA3BS:     return realMain<c_indexType, c_origAlph, c_transAlph, AlphabetEnum::DNA3BS>(options);
         default:                       throw 364;
     }
 }
@@ -221,6 +222,16 @@ void realMain(LambdaIndexerOptions     const & options)
                          TSbjSeqs &,                                                               // reference to owner
                          seqan3::detail::lazy<TTransAlphModString, TSbjSeqs> >;
 
+    // using TRedSbjSeqs   =
+    //   seqan3::detail::lazy_conditional_t<c_transAlph == c_redAlph,
+    //                      TTransSbjSeqs &,                                                          // reference to owner
+    //                      seqan3::detail::lazy_conditional_t<c_transAlph == AlphabetEnum::AMINO_ACID,
+    //                                      seqan3::detail::lazy<TRedAlphModString, TTransSbjSeqs, TRedSbjAlph>,
+    //                                      seqan3::detail::lazy_conditional_t<c_redAlph == AlphabetEnum::DNA4,
+    //                                                      seqan3::detail::lazy<TRedNuclAlphModString, TTransSbjSeqs, TRedSbjAlph>,
+    //                                                      seqan3::detail::lazy_conditional_t<c_redAlph == AlphabetEnum::DNA3BS,
+    //                                                                      seqan3::detail::lazy<TRedBisulfiteAlphModString, TTransSbjSeqs, TRedSbjAlph>,
+    //                                                                      seqan3::detail::lazy<TRedAlphModString, TTransSbjSeqs, TRedSbjAlph> > > > >;
     using TRedSbjSeqs   =
       seqan3::detail::lazy_conditional_t<c_transAlph == c_redAlph,
                          TTransSbjSeqs &,                                                          // reference to owner
@@ -229,9 +240,14 @@ void realMain(LambdaIndexerOptions     const & options)
                                          seqan3::detail::lazy<TRedAlphModString, TTransSbjSeqs, TRedSbjAlph> > >;
 
     TTransSbjSeqs       transSbjSeqs =
-        initHelper<TTransSbjAlph>(f.seqs, seqan3::view::translate_join, seqan3::view::translate_join);
+        initHelper<TTransSbjAlph>(f.seqs,
+                                  seqan3::view::translate_join,
+                                  seqan3::view::translate_join);
+
     TRedSbjSeqs         redSbjSeqs =
-        initHelper<TRedSbjAlph>(transSbjSeqs, seqan3::view::deep{seqan3::view::convert<TRedSbjAlph>}, seqan3::view::dna_n_to_random);
+        initHelper<TRedSbjAlph>(transSbjSeqs,
+                                seqan3::view::deep{seqan3::view::convert<TRedSbjAlph>},
+                                seqan3::view::dna_n_to_random<TRedSbjAlph>);
 
     if constexpr (c_origAlph != c_transAlph)
     {
@@ -242,7 +258,7 @@ void realMain(LambdaIndexerOptions     const & options)
     {
         if constexpr (c_transAlph != AlphabetEnum::AMINO_ACID)
         {
-            redSbjSeqs = transSbjSeqs | seqan3::view::dna_n_to_random;
+            redSbjSeqs = transSbjSeqs | seqan3::view::dna_n_to_random<TRedSbjAlph>;
         }
         else
         {
@@ -250,6 +266,7 @@ void realMain(LambdaIndexerOptions     const & options)
         }
     }
 
+    seqan3::debug_stream << redSbjSeqs[0] << '\t';
     f.index = generateIndex<c_dbIndexType == DbIndexType::BI_FM_INDEX>(redSbjSeqs, options);
 
     myPrint(options, 1, "Writing Index to disk...");
